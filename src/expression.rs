@@ -28,12 +28,15 @@ pub enum Expression {
     },
 }
 
-
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expression::Constant(value) => write!(f, "{:.6}", value),
-            Expression::Binary { operator, left, right } => {
+            Expression::Binary {
+                operator,
+                left,
+                right,
+            } => {
                 write!(f, "({} {} {})", left, operator, right)
             }
         }
@@ -77,7 +80,11 @@ impl ExpressionContext {
     fn eval_sync(&self, expression: &Expression) -> Result<f64, String> {
         match expression {
             Expression::Constant(value) => Ok(*value),
-            Expression::Binary { operator, left, right } => {
+            Expression::Binary {
+                operator,
+                left,
+                right,
+            } => {
                 let left_val = self.eval_sync(left)?;
                 let right_val = self.eval_sync(right)?;
 
@@ -88,7 +95,6 @@ impl ExpressionContext {
             }
         }
     }
-
 }
 
 impl Default for ExpressionContext {
@@ -105,7 +111,7 @@ mod tests {
     async fn test_basic_evaluation() {
         let context = ExpressionContext::new();
         let expr = ExpressionContext::new_constant_expression(42.0);
-        
+
         let result = context.eval(&expr).await.unwrap();
         assert_eq!(result, 42.0);
     }
@@ -113,7 +119,7 @@ mod tests {
     #[tokio::test]
     async fn test_binary_expression_evaluation() {
         let context = ExpressionContext::new();
-        
+
         let sub_expr = ExpressionContext::new_binary_expression(
             Operator::Add,
             ExpressionContext::new_constant_expression(10.0),
