@@ -1,10 +1,8 @@
-use std::collections::HashMap;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 /// Supported binary operators
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operator {
     Add,
     Subtract,
@@ -30,37 +28,6 @@ pub enum Expression {
     },
 }
 
-impl Hash for Expression {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Expression::Constant(value) => {
-                0u8.hash(state);
-                value.to_bits().hash(state);
-            }
-            Expression::Binary { operator, left, right } => {
-                1u8.hash(state);
-                operator.hash(state);
-                left.hash(state);
-                right.hash(state);
-            }
-        }
-    }
-}
-
-impl PartialEq for Expression {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Expression::Constant(a), Expression::Constant(b)) => a == b,
-            (
-                Expression::Binary { operator: op1, left: l1, right: r1 },
-                Expression::Binary { operator: op2, left: l2, right: r2 },
-            ) => op1 == op2 && l1 == l2 && r1 == r2,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for Expression {}
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -73,18 +40,13 @@ impl fmt::Display for Expression {
     }
 }
 
-/// Expression context that handles creation, evaluation, and caching
-pub struct ExpressionContext {
-    /// Cache for storing evaluation results to avoid recomputation
-    cache: tokio::sync::RwLock<HashMap<Expression, f64>>,
-}
+/// Expression context that handles creation and evaluation
+pub struct ExpressionContext;
 
 impl ExpressionContext {
     /// Create a new expression context
     pub fn new() -> Self {
-        Self {
-            cache: tokio::sync::RwLock::new(HashMap::new()),
-        }
+        Self
     }
 
     /// Create a constant expression
@@ -105,26 +67,9 @@ impl ExpressionContext {
         }
     }
 
-    /// Evaluate an expression asynchronously with caching
+    /// Evaluate an expression asynchronously
     pub async fn eval(&self, expression: &Expression) -> Result<f64, String> {
-        // Check cache first
-        {
-            let cache = self.cache.read().await;
-            if let Some(&cached_result) = cache.get(expression) {
-                return Ok(cached_result);
-            }
-        }
-
-        // Evaluate the expression
-        let result = self.eval_internal(expression).await?;
-
-        // Store in cache
-        {
-            let mut cache = self.cache.write().await;
-            cache.insert(expression.clone(), result);
-        }
-
-        Ok(result)
+        self.eval_internal(expression).await
     }
 
     /// Internal evaluation implementation using Box::pin for recursion
@@ -145,25 +90,6 @@ impl ExpressionContext {
         })
     }
 
-    /// Get cache statistics for debugging/monitoring
-    pub async fn get_cache_stats(&self) -> (usize, usize) {
-        let cache = self.cache.read().await;
-        let cache_size = cache.len();
-        let capacity = cache.capacity();
-        (cache_size, capacity)
-    }
-
-    /// Clear the expression cache
-    pub async fn clear_cache(&self) {
-        let mut cache = self.cache.write().await;
-        cache.clear();
-    }
-
-    /// Get a cached result if it exists (useful for testing cache behavior)
-    pub async fn get_cached_result(&self, expression: &Expression) -> Option<f64> {
-        let cache = self.cache.read().await;
-        cache.get(expression).copied()
-    }
 }
 
 impl Default for ExpressionContext {
@@ -177,29 +103,16 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_expression_caching() {
+    async fn test_basic_evaluation() {
         let context = ExpressionContext::new();
         let expr = ExpressionContext::new_constant_expression(42.0);
-
-        // First evaluation should miss cache
-        assert_eq!(context.get_cached_result(&expr).await, None);
         
-        let result1 = context.eval(&expr).await.unwrap();
-        assert_eq!(result1, 42.0);
-
-        // Second evaluation should hit cache
-        assert_eq!(context.get_cached_result(&expr).await, Some(42.0));
-        
-        let result2 = context.eval(&expr).await.unwrap();
-        assert_eq!(result2, 42.0);
-
-        // Verify cache stats
-        let (cache_size, _) = context.get_cache_stats().await;
-        assert_eq!(cache_size, 1);
+        let result = context.eval(&expr).await.unwrap();
+        assert_eq!(result, 42.0);
     }
 
     #[tokio::test]
-    async fn test_complex_expression_caching() {
+    async fn test_binary_expression_evaluation() {
         let context = ExpressionContext::new();
         
         let sub_expr = ExpressionContext::new_binary_expression(
@@ -208,21 +121,16 @@ mod tests {
             ExpressionContext::new_constant_expression(5.0),
         );
 
-        // Evaluate sub-expression multiple times - should be cached
-        context.eval(&sub_expr).await.unwrap();
-        context.eval(&sub_expr).await.unwrap();
+        let result = context.eval(&sub_expr).await.unwrap();
+        assert_eq!(result, 15.0);
 
         let main_expr = ExpressionContext::new_binary_expression(
             Operator::Subtract,
-            sub_expr.clone(),
+            sub_expr,
             ExpressionContext::new_constant_expression(3.0),
         );
 
         let result = context.eval(&main_expr).await.unwrap();
         assert_eq!(result, 12.0);
-
-        // Should have cached both sub-expression and main expression
-        let (cache_size, _) = context.get_cache_stats().await;
-        assert!(cache_size >= 2);
     }
 }
