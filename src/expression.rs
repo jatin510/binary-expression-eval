@@ -69,25 +69,24 @@ impl ExpressionContext {
 
     /// Evaluate an expression asynchronously
     pub async fn eval(&self, expression: &Expression) -> Result<f64, String> {
-        self.eval_internal(expression).await
+        // Wrap synchronous evaluation in async for API compatibility and future extensibility
+        self.eval_sync(expression)
     }
 
-    /// Internal evaluation implementation using Box::pin for recursion
-    fn eval_internal<'a>(&'a self, expression: &'a Expression) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<f64, String>> + 'a>> {
-        Box::pin(async move {
-            match expression {
-                Expression::Constant(value) => Ok(*value),
-                Expression::Binary { operator, left, right } => {
-                    let left_val = self.eval(left).await?;
-                    let right_val = self.eval(right).await?;
+    /// Synchronous evaluation - handles recursion naturally
+    fn eval_sync(&self, expression: &Expression) -> Result<f64, String> {
+        match expression {
+            Expression::Constant(value) => Ok(*value),
+            Expression::Binary { operator, left, right } => {
+                let left_val = self.eval_sync(left)?;
+                let right_val = self.eval_sync(right)?;
 
-                    match operator {
-                        Operator::Add => Ok(left_val + right_val),
-                        Operator::Subtract => Ok(left_val - right_val),
-                    }
+                match operator {
+                    Operator::Add => Ok(left_val + right_val),
+                    Operator::Subtract => Ok(left_val - right_val),
                 }
             }
-        })
+        }
     }
 
 }
