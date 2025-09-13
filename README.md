@@ -65,34 +65,8 @@ async fn main() {
 - **`Operator`**: Supported operations (Add, Subtract)  
 - **`ExpressionContext`**: Main interface for creating and evaluating expressions
 
-### Design Principles
-
-- **Separation of Concerns**: Async wrapper with synchronous evaluation core
-- **Memory Efficiency**: Shared sub-expressions using `Rc<Expression>`
-- **Extensibility**: Easy to add new operators and expression types
-- **Performance**: Optimized for evaluation-heavy workloads
-
 ## Running Tests
 
 ```bash
 cargo test
 ```
-
-## Performance Considerations
-
-- Uses `Rc<Expression>` for efficient memory sharing of reused sub-expressions
-- Synchronous evaluation core avoids unnecessary async overhead
-- Natural recursion handling without complex boxing patterns
-
-## Future Extensibility
-
-The design supports easy addition of:
-- New operators (Multiply, Divide, etc.)
-- Expression caching mechanisms
-- I/O-based operations (database lookups, API calls)
-- Different number types and precision levels
-
-## Requirements
-
-- Rust 2024 edition
-- Tokio runtime for async functionality
