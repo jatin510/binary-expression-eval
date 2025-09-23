@@ -23,16 +23,17 @@ impl fmt::Display for Operator {
 
 /// Core expression types - either a constant value or a binary operation
 #[derive(Debug, Clone)]
-pub enum Expression {
+pub enum Expression<'a> {
     Constant(f64),
     Binary {
         operator: Operator,
-        left: Rc<Expression>,
-        right: Rc<Expression>,
+        left: Rc<Expression<'a>>,
+        right: Rc<Expression<'a>>,
     },
+    Function(&'a str, &'a [f32]),
 }
 
-impl fmt::Display for Expression {
+impl fmt::Display for Expression<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expression::Constant(value) => write!(f, "{:.6}", value),
@@ -42,6 +43,9 @@ impl fmt::Display for Expression {
                 right,
             } => {
                 write!(f, "({} {} {})", left, operator, right)
+            }
+            Expression::Function(name,arg)=>{
+                write!(f, "(({}),({}, {}))", name, arg[0], arg[1])
             }
         }
     }
@@ -57,16 +61,16 @@ impl ExpressionContext {
     }
 
     /// Create a constant expression
-    pub fn new_constant_expression(value: f64) -> Expression {
+    pub fn new_constant_expression(value: f64) -> Expression<'static> {
         Expression::Constant(value)
     }
 
     /// Create a binary expression with the given operator and operands
-    pub fn new_binary_expression(
+    pub fn new_binary_expression<'a>(
         operator: Operator,
-        left: Expression,
-        right: Expression,
-    ) -> Expression {
+        left: Expression<'a>,
+        right: Expression<'a>,
+    ) -> Expression<'a> {
         Expression::Binary {
             operator,
             left: Rc::new(left),
@@ -75,7 +79,7 @@ impl ExpressionContext {
     }
 
     /// Evaluate an expression asynchronously
-    pub async fn eval(&self, expression: &Expression) -> Result<f64, String> {
+    pub async fn eval(&self, expression: &Expression<'_>) -> Result<f64, String> {
         // Wrap synchronous evaluation in async for API compatibility and future extensibility
         self.eval_sync(expression)
     }
@@ -104,7 +108,8 @@ impl ExpressionContext {
                         }
                     }
                 }
-            }
+            },
+            Expression::Function(_, _) => todo!()
         }
     }
 }
