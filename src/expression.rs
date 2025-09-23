@@ -6,6 +6,8 @@ use std::rc::Rc;
 pub enum Operator {
     Add,
     Subtract,
+    Multiply,
+    Divide,
 }
 
 impl fmt::Display for Operator {
@@ -13,22 +15,25 @@ impl fmt::Display for Operator {
         match self {
             Operator::Add => write!(f, "+"),
             Operator::Subtract => write!(f, "-"),
+            Operator::Multiply => write!(f, "*"),
+            Operator::Divide => write!(f, "/"),
         }
     }
 }
 
 /// Core expression types - either a constant value or a binary operation
 #[derive(Debug, Clone)]
-pub enum Expression {
+pub enum Expression<'a> {
     Constant(f64),
     Binary {
         operator: Operator,
-        left: Rc<Expression>,
-        right: Rc<Expression>,
+        left: Rc<Expression<'a>>,
+        right: Rc<Expression<'a>>,
     },
+    Function(&'a str, &'a[f32])
 }
 
-impl fmt::Display for Expression {
+impl<'a> fmt::Display for Expression<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expression::Constant(value) => write!(f, "{:.6}", value),
@@ -38,6 +43,10 @@ impl fmt::Display for Expression {
                 right,
             } => {
                 write!(f, "({} {} {})", left, operator, right)
+            }
+            Expression::Function(name, arguments)=>{
+                // write!(&mut s, "{name_str}{w})");
+                write!(f,"({}({:.6}, {:.6}))", name, arguments[0], arguments[1])
             }
         }
     }
@@ -53,16 +62,16 @@ impl ExpressionContext {
     }
 
     /// Create a constant expression
-    pub fn new_constant_expression(value: f64) -> Expression {
+    pub fn new_constant_expression<'a>(value: f64) -> Expression<'a> {
         Expression::Constant(value)
     }
 
     /// Create a binary expression with the given operator and operands
-    pub fn new_binary_expression(
+    pub fn new_binary_expression<'a>(
         operator: Operator,
-        left: Expression,
-        right: Expression,
-    ) -> Expression {
+        left: Expression<'a>,
+        right: Expression<'a>,
+    ) -> Expression<'a> {
         Expression::Binary {
             operator,
             left: Rc::new(left),
@@ -71,13 +80,13 @@ impl ExpressionContext {
     }
 
     /// Evaluate an expression asynchronously
-    pub async fn eval(&self, expression: &Expression) -> Result<f64, String> {
+    pub async fn eval(&self, expression: &Expression<'_>) -> Result<f64, String> {
         // Wrap synchronous evaluation in async for API compatibility and future extensibility
         self.eval_sync(expression)
     }
 
     /// Synchronous evaluation - handles recursion naturally
-    fn eval_sync(&self, expression: &Expression) -> Result<f64, String> {
+    fn eval_sync(self, expression: &Expression) -> Result<f64, String> {
         match expression {
             Expression::Constant(value) => Ok(*value),
             Expression::Binary {
@@ -91,9 +100,25 @@ impl ExpressionContext {
                 match operator {
                     Operator::Add => Ok(left_val + right_val),
                     Operator::Subtract => Ok(left_val - right_val),
+                    Operator::Multiply => Ok(left_val * right_val),
+                    Operator::Divide => {
+                        if right_val == 0.0 {
+                            Err("Divide by zero!".to_string())
+                        } else {
+                            Ok(left_val / right_val)
+                        }
+                    }
                 }
+            },
+            &Expression::Function(name, _) => {
+                let error_msg = format!("Function {} not found. Use expression context to add a function", name);
+                Err(error_msg)
             }
         }
+    }
+
+    pub fn add_function(&self, name: &str, func: ) -> Result<(), String>{
+        Ok(())
     }
 }
 

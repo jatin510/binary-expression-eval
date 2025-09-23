@@ -5,8 +5,8 @@ async fn main() {}
 
 #[cfg(test)]
 mod tests {
-
-    use crate::expression::{ExpressionContext, Operator};
+    use crate::expression;
+    use crate::expression::{Expression, ExpressionContext, Operator};
 
     #[tokio::test]
     async fn serialization_and_eval_works() {
@@ -68,5 +68,51 @@ mod tests {
             )
         );
         assert_eq!(context.eval(&e4).await.unwrap(), 15.000000_f64);
+    }
+
+    #[tokio::test]
+    async fn divide_by_zero_error() {
+        let context = ExpressionContext::new();
+
+        let de = ExpressionContext::new_binary_expression(
+            Operator::Divide,
+            ExpressionContext::new_constant_expression(10.0),
+            ExpressionContext::new_constant_expression(0.0),
+        );
+
+        let res = context.eval(&de).await;
+
+        assert_eq!(res.err(), Some("Divide by zero!".to_string()));
+    }
+
+    #[tokio::test]
+    async fn function_expressions_work_function_not_registered() {
+        let context = ExpressionContext::new();
+
+        let e1 = Expression::Function("pow", &[3.0, 2.0]);
+        assert_eq!(e1.to_string(), String::from("(pow(3.000000, 2.000000))"));
+
+        let res = context.eval(&e1).await;
+
+        assert_eq!(
+            res.err(),
+            Some("Function pow not found. Use expression context to add a function".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn function_expressions_work() {
+        let mut context = ExpressionContext::new();
+
+        let Ok(()) = context.add_function("pow", |arr| arr[0].powf(arr[1])) else {
+            panic!("Error adding a function");
+        };
+
+        // let e1 = Expression::Function("pow", &[3.0, 2.0]);
+        // assert_eq!(e1.to_string(), String::from("(pow(3.000000, 2.000000))"));
+        //
+        // let res = context.eval(&e1).await;
+        //
+        // assert_eq!(res, Ok(9.0_f64));
     }
 }
