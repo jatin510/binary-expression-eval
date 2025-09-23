@@ -6,6 +6,8 @@ use std::rc::Rc;
 pub enum Operator {
     Add,
     Subtract,
+    Multiply,
+    Divide,
 }
 
 impl fmt::Display for Operator {
@@ -13,6 +15,8 @@ impl fmt::Display for Operator {
         match self {
             Operator::Add => write!(f, "+"),
             Operator::Subtract => write!(f, "-"),
+            Operator::Multiply => write!(f, "*"),
+            Operator::Divide => write!(f, "/"),
         }
     }
 }
@@ -91,6 +95,14 @@ impl ExpressionContext {
                 match operator {
                     Operator::Add => Ok(left_val + right_val),
                     Operator::Subtract => Ok(left_val - right_val),
+                    Operator::Multiply => Ok(left_val * right_val),
+                    Operator::Divide => {
+                        if right_val == 0.0 {
+                            Err("Division by zero".to_string())
+                        } else {
+                            Ok(left_val / right_val)
+                        }
+                    }
                 }
             }
         }
